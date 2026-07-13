@@ -1,0 +1,125 @@
+<!DOCTYPE html> 
+<html lang="en"> 
+<head> 
+<meta charset="UTF-8"> 
+<meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+<title>Individual Defaults Inventory</title> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script> 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script> 
+<style> 
+        :root { --primary: #2c3e50; --accent: #673ab7; --highlight: #ffc107; --bg: #f5f5f7; } 
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; line-height: 1.6; background: var(--bg); color: #333; padding: 20px; } 
+        .container { max-width: 850px; margin: auto; background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); } 
+        .header { border-bottom: 4px solid var(--accent); margin-bottom: 30px; } 
+        .instructions { background: #ede7f6; padding: 20px; border-left: 5px solid var(--accent); margin-bottom: 30px; } 
+        .section { margin-bottom: 45px; border: 1px solid #eee; padding: 20px; border-radius: 8px; } 
+        .section-title { font-weight: bold; font-size: 1.25em; color: var(--accent); display: block; margin-bottom: 15px; } 
+        .question { margin-bottom: 20px; } 
+        .options { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; } 
+        .option-label { font-size: 0.85em; display: flex; align-items: center; cursor: pointer; background: #fff; padding: 8px 12px; border-radius: 4px; border: 1px solid #ddd; flex: 1; min-width: 100px; justify-content: center; } 
+        .option-label:hover { border-color: var(--accent); background: #f3f0f7; } 
+        input[type="radio"] { margin-right: 8px; } 
+        .btn { border: none; padding: 16px; border-radius: 6px; font-size: 1.1em; cursor: pointer; width: 100%; font-weight: bold; margin-top: 20px; } 
+        .btn-calc { background: var(--accent); color: white; } 
+        .btn-pdf { background: #2e7d32; color: white; display: none; } 
+        #results { margin-top: 40px; display: none; padding: 20px; background: #fff; border: 1px solid #ddd; border-radius: 8px; } 
+        .result-item { padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; } 
+        .top-3 { background: #fff9c4; border: 2px solid var(--highlight); border-radius: 6px; font-weight: bold; margin-bottom: 5px; } 
+        .badge { background: var(--highlight); color: #000; padding: 2px 8px; border-radius: 10px; font-size: 0.7em; margin-left: 10px; } 
+</style> 
+</head> 
+<body> 
+<div class="container"> 
+<div class="header"> 
+<h1>Individual Defaults Inventory</h1> 
+<p>A tool for self-reflection and personal growth.</p> 
+</div> 
+<div class="instructions"> 
+<strong>Instructions:</strong> Answer based on how you actually behave, not how you think you should behave. The defaults with the highest scores indicate areas for deeper reflection. 
+</div> 
+<form id="inventoryForm"> 
+<div id="questions-container"></div> 
+<button type="button" class="btn btn-calc" onclick="processResults()">Analyze My Defaults</button> 
+</form> 
+<div id="results"> 
+<div id="capture-area"> 
+<h2 style="color: var(--accent);">Your Results Summary</h2> 
+<div id="results-list"></div> 
+</div> 
+<button type="button" id="pdfBtn" class="btn btn-pdf" onclick="downloadPDF()">Download PDF Report</button> 
+</div> 
+</div> 
+<script> 
+    const sections = [ 
+        { id: 1, name: "Action Impulse", qs: ["I like to keep my ‘to do’ up to date and make sure every hour is filled with tasks for me and my team.", "I think it is always more important to focus on action rather than spend time on ideas and discussion.", "I feel most energized when I am in 'action-mode'."], scores: [4,3,2,1] }, 
+        { id: 2, name: "Competition Outlook", qs: ["I prioritise my needs over any other collective agenda.", "When faced with a dilemma of my deliverable vs. that of the team, I prefer giving priority to closing my deliverables.", "In a conflict situation with other groups, my outlook is determined by the views of my group."], scores: [4,3,2,1] }, 
+        { id: 3, name: "Control Orientation", qs: ["I think it is important to stay focussed on the agenda and ensure all discussions remain related to the relevant topics only.", "I usually hold on to my ideas and vision of how something should be done and influence the team in that direction.", "In a project, I take charge or direct the activities when I find a team member makes a mistake."], scores: [4,3,2,1] }, 
+        { id: 4, name: "Leaping as we Look", qs: ["I think every situation should be tackled quickly and immediately, as delays usually complicate problems.", "I prefer to use the available information and existing experience rather than researching or asking peers (believing one can always course-correct later).", "If I am faced with a situation that I have dealt with before, I tend to provide immediate solutions and align the team towards it."], scores: [4,3,2,1] }, 
+        { id: 5, name: "Task / Outcome and Relationship / Process Balance", qs: ["Adherence to process is very important to me even if it means not finishing something on time.", "I believe that agreed goals and laid-out processes are more critical in completing a task than the people involved.", "It is unfair to expect appreciation for a job well done if it is part of your specific role."], scores: [4,3,2,1] }, 
+        { id: 6, name: "Conflict Response", qs: ["I prefer not to upset others even though doing so may benefit them.", "I find confronting takes too much energy, so I avoid it.", "Some people tend to make me really angry and make me want to react strongly."], scores: [4,3,2,1] }, 
+        { id: 7, name: "Feedback Frame", qs: ["As a leader, I ensure I give feedback to my team members diligently and regularly as an ongoing practice.", "I believe feedback is not so critical for growth.", "I usually take accountability in ensuring actual change happens in my team member post-feedback."], scores: [1,2,3,4], special: {0: [1,2,3,4], 1:[4,3,2,1], 2:[1,2,3,4]} }, 
+        { id: 8, name: "Learning from Mistakes", qs: ["I like perfection and mistakes make me uncomfortable.", "Mistakes or errors are a reflection of lack of competence and need to be immediately called out.", "I give less important work to the person who is making mistakes in order to protect my deliverables."], scores: [4,3,2,1] }, 
+        { id: 9, name: "Feelings and Reason Balance", qs: ["When faced with a set-back or any critical situation my decision is based on data and facts alone", "I take decisions which are more logical and reasonable even if they may affect individuals adversely.", "I believe the workplace isn’t the place to talk about feelings and it is each individual’s responsibility to manage their emotions when at work"], scores: [4,3,2,1] }, 
+        { id: 10, name: "Rescue Resolve", qs: ["I feel a deep sense of satisfaction in solving others’ problems and receiving their gratitude", "My character of helping others is what people most respect about me.", "I feel guilty if I see someone in need of help and I cannot support them."], scores: [4,3,2,1] }, 
+        { id: 11, name: "Risk Response", qs: ["I think it is better to let experts and leaders take the decisions about changes in practices and protocols.", "I do a detailed cost-benefit analysis before taking on anything new, especially in high-stakes projects.", "I prefer building on something that is tried and tested."], scores: [4,3,2,1] }, 
+        { id: 12, name: "Diversity Dynamic", qs: ["I feel most comfortable working with people who are like me.", "I find discussions to bring in different perspectives wastes time, especially when there is a deadline.", "I think nowadays diversity is a buzzword and we tend to comply with it simply for the sake of it."], scores: [4,3,2,1] }, 
+        { id: 13, name: "Approval Need", qs: ["It is important for me to get feedback on plans and actions from people who matter to me.", "When I receive an idea or opinion from someone I respect, I tend to prioritize it over my own judgment.", "It gives me great pleasure when other people like my work even though I might be surprised by it."], scores: [4,3,2,1] }, 
+        { id: 14, name: "Sure Syndrome", qs: ["I believe things need to be viewed and stated in black and white.", "I trust my judgment and am comfortable defending my decisions even if they differ from others.", "I believe that revisiting established practices or decisions is often a sign of indecision or lack of confidence."], scores: [4,3,2,1] }, 
+        { id: 15, name: "Status Quoist", qs: ["I prefer to stay with the plan and adjusting too often to new circumstances only means we didn't plan well enough.", "I find last-minute ideas or changes disruptive.", "Personally, I feel that fundamental changes make me anxious."], scores: [4,3,2,1] }, 
+        { id: 16, name: "Inadequacy Impulse", qs: ["I hesitate to ask questions in a meeting because I think my questions may make me sound ignorant.", "I worry that others will soon realize I am not as capable or knowledgeable as they think I am.", "I tend to downplay my accomplishments, believing they are not as significant as others perceive them to be."], scores: [4,3,2,1] } 
+    ]; 
+    const labels = ["Always", "Mostly", "Sometimes", "Never"]; 
+    function render() { 
+        const container = document.getElementById('questions-container'); 
+        sections.forEach(sec => { 
+            let html = `<div class="section"><span class="section-title">Section ${sec.id}</span>`; 
+            sec.qs.forEach((q, i) => { 
+                html += `<div class="question"><p><strong>${sec.id}${String.fromCharCode(97+i)}.</strong> ${q}</p><div class="options">`; 
+                labels.forEach((label, idx) => { 
+                    let val = sec.special ? sec.special[i][idx] : sec.scores[idx]; 
+                    html += `<label class="option-label"><input type="radio" name="s${sec.id}q${i}" value="${val}" required> ${label}</label>`; 
+                }); 
+                html += `</div></div>`; 
+            }); 
+            container.innerHTML += html + `</div>`; 
+        }); 
+    } 
+    function processResults() { 
+        const form = document.getElementById('inventoryForm'); 
+        if (!form.checkValidity()) { alert("Please answer all questions before proceeding."); return; } 
+        const totals = sections.map(sec => { 
+            let sum = 0; 
+            sec.qs.forEach((_, i) => { 
+                sum += parseInt(document.querySelector(`input[name="s${sec.id}q${i}"]:checked`).value); 
+            }); 
+            return { id: sec.id, name: sec.name, total: sum }; 
+        }); 
+        const sorted = [...totals].sort((a, b) => b.total - a.total); 
+        const top3Val = sorted[2].total; 
+        const resultsList = document.getElementById('results-list'); 
+        resultsList.innerHTML = ""; 
+        totals.forEach(item => { 
+            const isTop3 = item.total >= top3Val && sorted.slice(0, 3).some(s => s.name === item.name); 
+            resultsList.innerHTML += `<div class="result-item ${isTop3 ? 'top-3' : ''}"> 
+<span>${item.id}. ${item.name} ${isTop3 ? '<span class="badge">TOP 3 STICKY DEFAULT</span>' : ''}</span> 
+<strong>${item.total} / 12</strong></div>`; 
+        }); 
+        document.getElementById('results').style.display = 'block'; 
+        document.getElementById('pdfBtn').style.display = 'block'; 
+        window.scrollTo({ top: document.getElementById('results').offsetTop, behavior: 'smooth' }); 
+    } 
+    async function downloadPDF() { 
+        const { jsPDF } = window.jspdf; 
+        const doc = new jsPDF('p', 'mm', 'a4'); 
+        const element = document.getElementById('capture-area'); 
+        const canvas = await html2canvas(element, { scale: 2 }); 
+        const imgData = canvas.toDataURL('image/png'); 
+        const pdfWidth = doc.internal.pageSize.getWidth() - 20; 
+        const pdfHeight = (canvas.height * pdfWidth) / canvas.width; 
+        doc.addImage(imgData, 'PNG', 10, 10, pdfWidth, pdfHeight); 
+        doc.save('Individual-Defaults-Report.pdf'); 
+    } 
+    render(); 
+</script> 
+</body> 
+</html>
